@@ -1,0 +1,78 @@
+Practical Machine Learning Assignment
+========================================================
+
+Devices like Jawbone Up, Nike FuelBand, and Fitbit, and now the Apple Watch, can easily collect a large amount of data about personal activity. People regularly record how often they do an activity, but rarely how well they do it. This project examines data from accelerometers on the belt, forearm, arm, and dumbell of participants to learn how to predict the behaviour of test cases. Participants were asked to perform barbell lifts correctly and incorrectly in 5 different ways.
+
+The machine learning method used for this assignment is random forest with out-of-bag error estimate, which promises excellent accuracy. Modelling using Regression Trees was trialled, but promised less than 50% accuracy and was therefore rejected.
+
+Load library
+```{r results='hide'}
+library(caret)
+```
+
+Load data
+```{r results='hide'}
+RawData <- read.csv("pml-training.csv",na.strings=c("NA",""))
+```
+
+Clean_data and remove unused information
+Assuming columns with NA or empty rows are unused variables
+```{r results='hide'}
+NAs <- apply(RawData,2,function(x) {sum(is.na(x))}) 
+CleanRaw <- RawData[,which(NAs == 0)]
+remove <- grep("timestamp|X|user_name|new_window|num_window",names(CleanRaw))
+CleanRaw <- CleanRaw[,-remove]
+```
+
+Hold out 20% sample for validation
+```{r results='hide'}
+inTrain<-createDataPartition(y=CleanRaw$classe,p=0.8,list=FALSE)
+clean_data_train<-CleanRaw[inTrain,]
+clean_data_validate<-CleanRaw[-inTrain,]
+```
+
+Model - using random forest
+```{r}
+set.seed(12345) 
+model_rf<-train(classe~ . , data = clean_data_train, method = 'rf', trControl=trainControl(method='oob'))
+model_rf
+```
+
+Assess accuracy and out of sample error
+```{r}
+pred <- predict(model_rf, clean_data_validate)
+confusionMatrix(pred,clean_data_validate$classe)
+```
+
+Show variable importance
+```{r}
+varImp(model_rf)
+```
+
+Load and clean test dataset
+```{r results='hide'} 
+test_data<-read.csv("pml-testing.csv",na.strings=c("NA",""))
+NAs <- apply(test_data,2,function(x) {sum(is.na(x))}) 
+clean_test_data <- test_data[,which(NAs == 0)]
+remove <- grep("timestamp|X|user_name|new_window|num_window",names(test_data))
+clean_test_data <- clean_test_data[,-remove]
+```
+
+Output prediction
+```{r results='hide'}
+predictions <- predict(model_rf, clean_test_data)
+predictions
+```
+
+Write out to file
+```{r eval=FALSE}
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(predictions)
+```
